@@ -1,0 +1,127 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.Events;
+
+[Serializable]
+public class EncounterEvent
+{
+    public string encounterName = "SOS Signal";
+    
+    [Header("Trigger Conditions")]
+    public TriggerType triggerType = TriggerType.DistanceTraveled;
+    [Tooltip("Target distance in world units (if DistanceTraveled) or index.")]
+    public float triggerThreshold = 500f; 
+    public Transform wayPointLocation; // For WaypointProximity trigger type
+
+    [Header("Encounter Deliverables")]
+    public AudioClip dialogueAudioClip;
+    public Vector2 sonarContactPosition; // Relative position for dynamic CRT blip
+    
+    [Header("Unity Events (Hook up Radio/CRT/Haptics)")]
+    public UnityEvent onEncounterTriggered;
+
+    [HideInInspector] public bool hasTriggered = false;
+}
+
+public enum TriggerType
+{
+    DistanceTraveled,
+    WaypointProximity,
+    ManualTrigger
+}
+
+public class EncounterManager : MonoBehaviour
+{
+    [Header("Tracking Target")]
+    [SerializeField] private Transform submarineProxy;
+    
+    [Header("Connected Cockpit Systems")]
+    [SerializeField] private RadioDialogueController radioController;
+    [SerializeField] private SonarTerrain sonarDriver;
+
+    [Header("Scripted Encounter List")]
+    [SerializeField] private List<EncounterEvent> encounterList = new List<EncounterEvent>();
+
+    private Vector3 lastPosition;
+    private float totalDistanceTraveled = 0f;
+
+    private void Start()
+    {
+        if (submarineProxy != null)
+        {
+            lastPosition = submarineProxy.position;
+        }
+    }
+
+    private void Update()
+    {
+        if (submarineProxy == null) return;
+
+        // 1. Calculate total distance traveled by submarine
+        float stepDistance = Vector3.Distance(submarineProxy.position, lastPosition);
+        totalDistanceTraveled += stepDistance;
+        lastPosition = submarineProxy.position;
+
+        // 2. Evaluate un-triggered encounters
+        foreach (var encounter in encounterList)
+        {
+            if (encounter.hasTriggered) continue;
+
+            bool shouldTrigger = false;
+
+            switch (encounter.triggerType)
+            {
+                case TriggerType.DistanceTraveled:
+                    if (totalDistanceTraveled >= encounter.triggerThreshold)
+                    {
+                        shouldTrigger = true;
+                    }
+                    break;
+
+                case TriggerType.WaypointProximity:
+                    if (encounter.wayPointLocation != null)
+                    {
+                        float distToWaypoint = Vector3.Distance(submarineProxy.position, encounter.wayPointLocation.position);
+                        if (distToWaypoint <= encounter.triggerThreshold)
+                        {
+                            shouldTrigger = true;
+                        }
+                    }
+                    break;
+            }
+
+            if (shouldTrigger)
+            {
+                ExecuteEncounter(encounter);
+            }
+        }
+    }
+
+    private void ExecuteEncounter(EncounterEvent encounter)
+    {
+        encounter.hasTriggered = true;
+        Debug.Log($"<color=cyan>[Encounter System] Executing Special Event: {encounter.encounterName}</color>");
+
+        // 1. Play dialogue clip through radio if assigned
+        if (radioController != null && encounter.dialogueAudioClip != null)
+        {
+            // You can add a PlaySpecificClip method to RadioDialogueController or call directly
+            radioController.PlayNextDialogue();
+        }
+
+        // 2. Trigger custom UnityEvents (e.g. sound alarms, flicker cockpit lights)
+        encounter.onEncounterTriggered?.Invoke();
+    }
+
+    // Public method to trigger encounters manually via levers/triggers
+    public void TriggerEncounterByName(string name)
+    {
+        var encounter = encounterList.Find(e => e.encounterName == name && !e.hasTriggered);
+        if (encounter != null)
+        {
+            ExecuteEncounter(encounter);
+        }
+    }
+}
