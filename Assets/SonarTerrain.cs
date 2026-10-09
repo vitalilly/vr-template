@@ -11,7 +11,7 @@ public class SonarTerrain : MonoBehaviour
     [SerializeField] private Transform submarine2DProxy;
 
     [Header("Sonar Visual Controls")]
-    [ColorUsage(true, true)] // Enables HDR color picker for VR bloom intensity
+    [ColorUsage(true, true)]
     [SerializeField] private Color sonarColor = new Color(0f, 1f, 0.3f, 1f);
     [Tooltip("Arc width of the illuminated trail in degrees (e.g. 60).")]
     [Range(10f, 180f)]
@@ -34,6 +34,10 @@ public class SonarTerrain : MonoBehaviour
     private Material sonarMaterial;
     private float currentSweepAngle;
 
+    // Contact Array Storage for Shader
+    private Vector4[] contactsDataArray = new Vector4[16];
+    private int activeContactCount = 0;
+
     // Property IDs
     private static readonly int SonarColorID = Shader.PropertyToID("_SonarColor");
     private static readonly int SweepAngleID = Shader.PropertyToID("_SweepAngle");
@@ -47,10 +51,11 @@ public class SonarTerrain : MonoBehaviour
     private static readonly int ScanlineCountID = Shader.PropertyToID("_ScanlineCount");
     private static readonly int ScanlineIntensityID = Shader.PropertyToID("_ScanlineIntensity");
     private static readonly int GlowMultiplierID = Shader.PropertyToID("_GlowMultiplier");
+    private static readonly int ContactsID = Shader.PropertyToID("_Contacts");
+    private static readonly int ContactCountID = Shader.PropertyToID("_ContactCount");
 
     private void Awake()
     {
-        // 1. Grab or instantiate material instance safely
         if (sonarMeshRenderer != null)
         {
             sonarMaterial = sonarMeshRenderer.material;
@@ -67,7 +72,6 @@ public class SonarTerrain : MonoBehaviour
             return;
         }
 
-        // 2. Set static material textures
         if (terrainMapTexture != null)
         {
             sonarMaterial.SetTexture(TerrainMapID, terrainMapTexture);
@@ -80,14 +84,11 @@ public class SonarTerrain : MonoBehaviour
     {
         if (sonarMaterial == null) return;
 
-        // 1. Advance sweep rotation (0 to 360 degrees)
+        // Advance sweep rotation
         currentSweepAngle += sweepSpeedDegreesPerSec * Time.deltaTime;
         currentSweepAngle %= 360f;
 
-        // 2. Update dynamic and user-tweakable parameters
-        UpdateMaterialProperties();
-
-        // 3. Track submarine 2D position and heading
+        // Track submarine 2D position and heading
         if (submarine2DProxy != null)
         {
             Vector3 pos = submarine2DProxy.position;
@@ -96,6 +97,8 @@ public class SonarTerrain : MonoBehaviour
             float headingRad = submarine2DProxy.eulerAngles.z * Mathf.Deg2Rad;
             sonarMaterial.SetFloat(SubmarineHeadingID, headingRad);
         }
+
+        UpdateMaterialProperties();
     }
 
     private void UpdateMaterialProperties()
@@ -114,9 +117,24 @@ public class SonarTerrain : MonoBehaviour
         sonarMaterial.SetFloat(ScanlineCountID, scanlineCount);
         sonarMaterial.SetFloat(ScanlineIntensityID, scanlineIntensity);
         sonarMaterial.SetFloat(GlowMultiplierID, glowMultiplier);
+
+        // Pass Contact Array to Shader
+        sonarMaterial.SetVectorArray(ContactsID, contactsDataArray);
+        sonarMaterial.SetInt(ContactCountID, activeContactCount);
     }
 
-    // Public API functions for interactive VR knobs / dials
+    /// <summary>
+    /// Call this from SonarBeaconTracker to pass active target blips directly into the shader.
+    /// </summary>
+    public void UpdateShaderContacts(Vector4[] contacts, int count)
+    {
+        activeContactCount = Mathf.Min(count, 16);
+        for (int i = 0; i < activeContactCount; i++)
+        {
+            contactsDataArray[i] = contacts[i];
+        }
+    }
+
     public void SetMaxDistance(float newRange) => maxDistance = Mathf.Max(10f, newRange);
     public void SetSweepWidth(float newWidth) => sweepWidthDegrees = Mathf.Clamp(newWidth, 10f, 180f);
     public void SetSonarColor(Color newColor) => sonarColor = newColor;

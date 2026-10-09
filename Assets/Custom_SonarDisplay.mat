@@ -35,21 +35,21 @@ Material:
     m_Floats:
     - _AcousticAttenuation: 1.5
     - _Curvature: 0.5
-    - _GlowMultiplier: 3.83
+    - _GlowMultiplier: 5
     - _MaxDepth: 1200
     - _MaxDistance: 500
-    - _ScanlineCount: 400
-    - _ScanlineIntensity: 0.658
-    - _ScanlineSpeed: 2
+    - _ScanlineCount: 250
+    - _ScanlineIntensity: 1
+    - _ScanlineSpeed: 3
     - _SubDepth: 1200
     - _SubmarineHeading: 0
-    - _SweepAngle: 180.87704
+    - _SweepAngle: 22.27174
     - _SweepSpeed: 1
-    - _SweepWidth: 60
-    - _VignettePower: 1.45
+    - _SweepWidth: 90
+    - _VignettePower: 2.01
     m_Colors:
     - _MapSizeWorld: {r: 1000, g: 1000, b: 0, a: 0}
-    - _SonarColor: {r: 0, g: 1, b: 0.29803926, a: 1}
+    - _SonarColor: {r: 1, g: 0.8806697, b: 0, a: 1}
     - _SubmarinePos: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

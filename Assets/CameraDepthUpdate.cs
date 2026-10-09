@@ -10,7 +10,7 @@ public class CameraDepthUpdate : MonoBehaviour
     [Header("Intro Sequence Configuration")]
     [SerializeField] private bool playIntroSequence = true;
     [SerializeField] private float surfaceStartDepth = 0f;          // Initial drop depth (Surface)
-    [SerializeField] private float targetDeploymentDepth = 150f;    // Point of no return
+    [SerializeField] private float targetDeploymentDepth = 400f;    // Point of no return
     [SerializeField] private float introDescentDuration = 12.0f;     // Sequence duration in seconds
     [SerializeField] private AnimationCurve descentEaseCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
@@ -62,9 +62,9 @@ public class CameraDepthUpdate : MonoBehaviour
             isIntroActive = false;
         }
     }
-    / C# event fired when the intro sequence finishes
+    // C# event fired when the intro sequence finishes
     public static event System.Action OnIntroSequenceCompleted;
-    
+
     private IEnumerator RunIntroSequence()
     {
         isIntroActive = true;
@@ -104,12 +104,12 @@ public class CameraDepthUpdate : MonoBehaviour
                 PlayRadioClip(endDescentRadioClip);
             }
             // Notify subscribers (EncounterManager) that the intro is complete
-            OnIntroSequenceCompleted?.Invoke();
+
             yield return null;
         }
 
         // --- POINT OF NO RETURN REACHED ---
-        minDepthMeters = targetDeploymentDepth;
+        // minDepthMeters = targetDeploymentDepth;
         currentDepthMeters = targetDeploymentDepth;
 
         // Unlock joint physics for player control
@@ -117,7 +117,7 @@ public class CameraDepthUpdate : MonoBehaviour
         {
             jointRigidbody.isKinematic = false;
         }
-
+        OnIntroSequenceCompleted?.Invoke();
         isIntroActive = false;
     }
 
@@ -166,7 +166,8 @@ public class CameraDepthUpdate : MonoBehaviour
 
         if (encounterMngr != null)
         {
-            encounterMngr.UpdateDepth(normalizedDepth);
+            encounterMngr.UpdateDepth(currentDepthMeters);
+            // Debug.Log("Sending depth"+normalizedDepth);
         }
 
         // Pass updated depth parameters to Sonar CRT Shader
@@ -205,7 +206,9 @@ public class CameraDepthUpdate : MonoBehaviour
     }
 
     public float GetCurrentDepth() => currentDepthMeters;
+    public void SetCurrentDepth(float depth) {currentDepthMeters = depth;} 
     public float GetNormalizedDepth() => normalizedDepth;
+    public float GetMaxDepth() => maxDepthMeters;
     public bool IsIntroActive() => isIntroActive;
     
     private float WrapAngle(float angle)

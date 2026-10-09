@@ -39,6 +39,7 @@ Shader "Custom/SonarCRTDisplay"
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            #pragma target 3.0
             #include "UnityCG.cginc"
 
             struct appdata
@@ -53,18 +54,17 @@ Shader "Custom/SonarCRTDisplay"
                 float2 uv : TEXCOORD0;
             };
 
-            // Global Shader Uniforms
+            // Uniforms
             sampler2D _TerrainMap;
             float4 _MapSizeWorld;
             float4 _SubmarinePos;
             float _SubmarineHeading;
 
-            fixed4 _SonarColor;
+            float4 _SonarColor;
             float _SweepAngle;
             float _SweepWidth;
             float _MaxDistance;
 
-            // Depth & Attenuation Uniforms
             float _SubDepth;
             float _MaxDepth;
             float _AcousticAttenuation;
@@ -76,17 +76,15 @@ Shader "Custom/SonarCRTDisplay"
             float _VignettePower;
             float _GlowMultiplier;
 
-            // Target Contact Blips Array (x = World Distance, y = World Bearing Angle in Deg)
+            // Contacts Array Uniforms
             float4 _Contacts[16]; 
             int _ContactCount;
 
-            // --- 1. Pseudo-Random Noise Generator ---
             float RandomNoise(float2 uv)
             {
                 return frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453);
             }
 
-            // --- 2. CRT Screen Barrel Curvature Helper ---
             float2 CurveUVs(float2 uv, float bend)
             {
                 float2 centered = uv - 0.5;
@@ -95,7 +93,6 @@ Shader "Custom/SonarCRTDisplay"
                 return centered + 0.5;
             }
 
-            // --- 3. 2D Vector Rotation Helper ---
             float2 RotateVector(float2 v, float angleRad)
             {
                 float s = sin(angleRad);
@@ -111,38 +108,32 @@ Shader "Custom/SonarCRTDisplay"
                 return o;
             }
 
-            fixed4 frag (v2f i) : SV_Target
+            float4 frag (v2f i) : SV_Target
             {
-                // 1. Apply CRT Screen Barrel Curvature
+                // 1. CRT Screen Barrel Curvature
                 float2 crtUV = CurveUVs(i.uv, _Curvature);
 
-                // Clip pixels distorted beyond screen bezel bounds [0, 1]
                 if (crtUV.x < 0.0 || crtUV.x > 1.0 || crtUV.y < 0.0 || crtUV.y > 1.0)
-                    return fixed4(0, 0, 0, 0);
+                    return float4(0, 0, 0, 0);
 
-                // Center coordinates to [-1.0, 1.0] domain (Submarine locked at center 0,0)
                 float2 polarUV = (crtUV - 0.5) * 2.0;
                 float radius = length(polarUV);
-                if (radius > 1.0) return fixed4(0, 0, 0, 0); // Clip outer circular display frame
+                if (radius > 1.0) return float4(0, 0, 0, 0);
 
-                // Calculate pixel polar bearing angle [0, 360] degrees
                 float angle = atan2(polarUV.y, polarUV.x) * (180.0 / 3.14159265);
                 if (angle < 0.0) angle += 360.0;
 
-                // --- 2. Calculate Depth Attenuation Factor ---
-                // Clamp max depth bound safely to avoid division by zero
-                float safeMaxDepth = (_MaxDepth > 1.0) ? _MaxDepth : 1.0;
+                // 2. Depth Attenuation Factor
+                float safeMaxDepth = max(_MaxDepth, 1.0);
                 float depthRatio = saturate(_SubDepth / safeMaxDepth);
-                
-                // Exponential signal decay factor based on pixel radius & submarine depth
                 float signalDecay = exp(-radius * depthRatio * _AcousticAttenuation * 2.0);
 
-                // --- 3. Polar Range Rings & Radar Sweep Line ---
+                // 3. Polar Range Rings & Radar Sweep Line
                 float ring = frac(radius * 4.0);
                 float grid = smoothstep(0.04, 0.01, abs(ring - 0.02)) * 0.25;
                 grid *= lerp(1.0, 0.4, depthRatio);
 
-                float width = (_SweepWidth > 0.0) ? _SweepWidth : 60.0;
+                float width = max(_SweepWidth, 10.0);
                 float angleDiff = _SweepAngle - angle;
                 if (angleDiff < 0.0) angleDiff += 360.0;
 
@@ -151,60 +142,58 @@ Shader "Custom/SonarCRTDisplay"
                 {
                     phosphorTrail = 1.0 - (angleDiff / width); 
                 }
-
                 phosphorTrail *= signalDecay;
 
-                // --- 4. Terrain Map World Sampling ---
+                // 4. Terrain Map World Sampling
                 float2 worldOffset = polarUV * (_MaxDistance * 0.5);
                 worldOffset = RotateVector(worldOffset, _SubmarineHeading);
 
-                float2 terrainUV = ((_SubmarinePos.xy + worldOffset) / _MapSizeWorld.xy) + 0.5;
+                float2 terrainUV = ((_SubmarinePos.xy + worldOffset) / max(_MapSizeWorld.xy, float2(1,1))) + 0.5;
                 
                 float terrainGlow = 0.0;
                 if (terrainUV.x >= 0.0 && terrainUV.x <= 1.0 && terrainUV.y >= 0.0 && terrainUV.y <= 1.0)
                 {
-                    half terrainValue = tex2D(_TerrainMap, terrainUV).r;
+                    float terrainValue = tex2D(_TerrainMap, terrainUV).r;
                     terrainGlow = terrainValue * phosphorTrail * 2.5 * signalDecay;
                 }
 
-                // --- 5. Dynamic Contact Blips Array ---
+                // 5. Dynamic Contact Blips Array
                 float blipGlow = 0.0;
-                for (int c = 0; c < _ContactCount; c++)
+                int count = clamp(_ContactCount, 0, 16);
+                for (int c = 0; c < count; c++)
                 {
-                    float targetDist = _Contacts[c].x / _MaxDistance;
+                    float targetDist = _Contacts[c].x / max(_MaxDistance, 1.0);
                     float targetBearing = _Contacts[c].y;
 
                     float distDiff = abs(radius - targetDist);
                     float bDiff = abs(angle - targetBearing);
                     if (bDiff > 180.0) bDiff = 360.0 - bDiff;
 
-                    if (distDiff < 0.04 && bDiff < 3.0 && angleDiff <= width)
+                    if (distDiff < 0.2 && bDiff < 6.0 && angleDiff <= width)
                     {
-                        blipGlow += smoothstep(0.04, 0.00, distDiff) * phosphorTrail * 2.0 * signalDecay;
+                        blipGlow += smoothstep(0.2, 0.00, distDiff) * phosphorTrail * 2.0 * signalDecay;
                     }
                 }
 
                 // Submarine Position Marker
                 float centerSubBlip = smoothstep(0.03, 0.00, radius) * 1.5;
 
-                // --- 6. Abyssal Static / Grain Artifacts ---
+                // 6. Static / Grain Artifacts
                 float staticNoise = RandomNoise(crtUV + float2(_Time.x, _Time.y)) * depthRatio * 0.15;
 
-                // --- 7. Combine Signal Layers ---
+                // 7. Combine Signal Layers
                 float baseIntensity = grid + (phosphorTrail * 0.3) + terrainGlow + blipGlow + centerSubBlip + staticNoise;
 
-                // CRT Scanlines & Vignette
                 float scanline = sin((crtUV.y + _Time.y * _ScanlineSpeed * 0.01) * _ScanlineCount * 3.14159265);
                 scanline = lerp(1.0, (scanline * 0.5 + 0.5), _ScanlineIntensity);
 
                 float vignettePowerAdjusted = _VignettePower + (depthRatio * 1.5);
-                float vignette = radius;
-                vignette = pow(1.0 - vignette * 0.5, vignettePowerAdjusted);
+                float vignette = pow(saturate(1.0 - radius * 0.5), vignettePowerAdjusted);
 
                 float finalIntensity = baseIntensity * scanline * vignette;
-                fixed3 finalColor = _SonarColor.rgb * finalIntensity * _GlowMultiplier;
+                float3 finalColor = _SonarColor.rgb * finalIntensity * _GlowMultiplier;
 
-                return fixed4(finalColor, clamp(finalIntensity + 0.1, 0.0, 1.0));
+                return float4(finalColor, saturate(finalIntensity + 0.1));
             }
             ENDCG
         }
