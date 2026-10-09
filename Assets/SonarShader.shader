@@ -7,6 +7,11 @@ Shader "Custom/SonarCRTDisplay"
         _SweepWidth ("Trail Width (Degrees)", Float) = 60
         _MaxDistance ("Max Sonar Range (World Units)", Float) = 500
 
+        [Header(Depth and Attenuation Settings)]
+        _SubDepth ("Submarine Current Depth (Meters)", Float) = 50.0
+        _MaxDepth ("Trench Max Depth (Meters)", Float) = 1200.0
+        _AcousticAttenuation ("Acoustic Attenuation Strength", Range(0, 5)) = 1.5
+
         [Header(Terrain Map Input)]
         _TerrainMap ("Terrain Mask (White = Land)", 2D) = "black" {}
         _MapSizeWorld ("Terrain Map World Size (Width, Height)", Vector) = (1000, 1000, 0, 0)
@@ -59,6 +64,11 @@ Shader "Custom/SonarCRTDisplay"
             float _SweepWidth;
             float _MaxDistance;
 
+            // Depth & Attenuation Uniforms
+            float _SubDepth;
+            float _MaxDepth;
+            float _AcousticAttenuation;
+
             float _Curvature;
             float _ScanlineCount;
             float _ScanlineSpeed;
@@ -70,7 +80,13 @@ Shader "Custom/SonarCRTDisplay"
             float4 _Contacts[16]; 
             int _ContactCount;
 
-            // --- 1. CRT Screen Barrel Curvature Helper ---
+            // --- 1. Pseudo-Random Noise Generator ---
+            float RandomNoise(float2 uv)
+            {
+                return frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453);
+            }
+
+            // --- 2. CRT Screen Barrel Curvature Helper ---
             float2 CurveUVs(float2 uv, float bend)
             {
                 float2 centered = uv - 0.5;
@@ -79,7 +95,7 @@ Shader "Custom/SonarCRTDisplay"
                 return centered + 0.5;
             }
 
-            // --- 2. 2D Vector Rotation Helper ---
+            // --- 3. 2D Vector Rotation Helper ---
             float2 RotateVector(float2 v, float angleRad)
             {
                 float s = sin(angleRad);
@@ -113,9 +129,18 @@ Shader "Custom/SonarCRTDisplay"
                 float angle = atan2(polarUV.y, polarUV.x) * (180.0 / 3.14159265);
                 if (angle < 0.0) angle += 360.0;
 
-                // --- 2. Polar Range Rings & Radar Sweep Line ---
+                // --- 2. Calculate Depth Attenuation Factor ---
+                // Clamp max depth bound safely to avoid division by zero
+                float safeMaxDepth = (_MaxDepth > 1.0) ? _MaxDepth : 1.0;
+                float depthRatio = saturate(_SubDepth / safeMaxDepth);
+                
+                // Exponential signal decay factor based on pixel radius & submarine depth
+                float signalDecay = exp(-radius * depthRatio * _AcousticAttenuation * 2.0);
+
+                // --- 3. Polar Range Rings & Radar Sweep Line ---
                 float ring = frac(radius * 4.0);
                 float grid = smoothstep(0.04, 0.01, abs(ring - 0.02)) * 0.25;
+                grid *= lerp(1.0, 0.4, depthRatio);
 
                 float width = (_SweepWidth > 0.0) ? _SweepWidth : 60.0;
                 float angleDiff = _SweepAngle - angle;
@@ -127,27 +152,22 @@ Shader "Custom/SonarCRTDisplay"
                     phosphorTrail = 1.0 - (angleDiff / width); 
                 }
 
-                // --- 3. Terrain Map World Sampling ---
-                // Convert screen radius & polar vector to real-world offset distance relative to sub
+                phosphorTrail *= signalDecay;
+
+                // --- 4. Terrain Map World Sampling ---
                 float2 worldOffset = polarUV * (_MaxDistance * 0.5);
-                
-                // Rotate offset vector by sub's heading angle so the display remains Head-Up
                 worldOffset = RotateVector(worldOffset, _SubmarineHeading);
 
-                // Translate to absolute world position and normalize into [0.0, 1.0] terrain UV space
-                // Adding 0.5 centers the map origin (0,0) to the middle of the texture
                 float2 terrainUV = ((_SubmarinePos.xy + worldOffset) / _MapSizeWorld.xy) + 0.5;
                 
                 float terrainGlow = 0.0;
-                // Sample terrain map only when within valid texture coordinates
                 if (terrainUV.x >= 0.0 && terrainUV.x <= 1.0 && terrainUV.y >= 0.0 && terrainUV.y <= 1.0)
                 {
                     half terrainValue = tex2D(_TerrainMap, terrainUV).r;
-                    // Illuminate land/obstacle tiles bright green when hit by the sweep beam
-                    terrainGlow = terrainValue * phosphorTrail * 2.5;
+                    terrainGlow = terrainValue * phosphorTrail * 2.5 * signalDecay;
                 }
 
-                // --- 4. Dynamic Contact Blips Array ---
+                // --- 5. Dynamic Contact Blips Array ---
                 float blipGlow = 0.0;
                 for (int c = 0; c < _ContactCount; c++)
                 {
@@ -160,25 +180,27 @@ Shader "Custom/SonarCRTDisplay"
 
                     if (distDiff < 0.04 && bDiff < 3.0 && angleDiff <= width)
                     {
-                        blipGlow += smoothstep(0.04, 0.00, distDiff) * phosphorTrail * 2.0;
+                        blipGlow += smoothstep(0.04, 0.00, distDiff) * phosphorTrail * 2.0 * signalDecay;
                     }
                 }
 
-                // Submarine Position Marker (Always illuminated at screen center 0,0)
+                // Submarine Position Marker
                 float centerSubBlip = smoothstep(0.03, 0.00, radius) * 1.5;
 
-                // --- 5. Combine Signal Layers ---
-                float baseIntensity = grid + (phosphorTrail * 0.3) + terrainGlow + blipGlow + centerSubBlip;
+                // --- 6. Abyssal Static / Grain Artifacts ---
+                float staticNoise = RandomNoise(crtUV + float2(_Time.x, _Time.y)) * depthRatio * 0.15;
 
-                // Animated CRT Scanline Overlay
+                // --- 7. Combine Signal Layers ---
+                float baseIntensity = grid + (phosphorTrail * 0.3) + terrainGlow + blipGlow + centerSubBlip + staticNoise;
+
+                // CRT Scanlines & Vignette
                 float scanline = sin((crtUV.y + _Time.y * _ScanlineSpeed * 0.01) * _ScanlineCount * 3.14159265);
                 scanline = lerp(1.0, (scanline * 0.5 + 0.5), _ScanlineIntensity);
 
-                // Lens Edge Vignette Shadow
+                float vignettePowerAdjusted = _VignettePower + (depthRatio * 1.5);
                 float vignette = radius;
-                vignette = pow(1.0 - vignette * 0.5, _VignettePower);
+                vignette = pow(1.0 - vignette * 0.5, vignettePowerAdjusted);
 
-                // Final Color Synthesis with HDR Glow Multiplier
                 float finalIntensity = baseIntensity * scanline * vignette;
                 fixed3 finalColor = _SonarColor.rgb * finalIntensity * _GlowMultiplier;
 

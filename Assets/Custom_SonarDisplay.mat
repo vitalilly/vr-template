@@ -33,14 +33,17 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _AcousticAttenuation: 1.5
     - _Curvature: 0.5
     - _GlowMultiplier: 3.83
+    - _MaxDepth: 1200
     - _MaxDistance: 500
     - _ScanlineCount: 400
     - _ScanlineIntensity: 0.658
     - _ScanlineSpeed: 2
+    - _SubDepth: 1200
     - _SubmarineHeading: 0
-    - _SweepAngle: 248.07462
+    - _SweepAngle: 180.87704
     - _SweepSpeed: 1
     - _SweepWidth: 60
     - _VignettePower: 1.45

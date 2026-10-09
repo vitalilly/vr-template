@@ -50,7 +50,7 @@ public class SonarMapUpdater : MonoBehaviour
                 newPos.z = transform.position.z; // Preserve orthographic Z depth
                 transform.position = newPos;
 
-                if (Vector3.Distance(transform.position, lastRenderPosition) >= minimumMoveDistance)
+               // if (Vector3.Distance(transform.position, lastRenderPosition) >= minimumMoveDistance)
                 {
                     RenderMap();
                 }

@@ -35,7 +35,6 @@ public class Submarine2DNavProxy : MonoBehaviour
     }
 
 
-
     private void FixedUpdate()
     {
         // Smooth input
