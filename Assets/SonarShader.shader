@@ -3,9 +3,10 @@ Shader "Custom/SonarCRTDisplay"
     Properties
     {
         _SonarColor ("Sonar Phosphor Color", Color) = (0, 1, 0.3, 1)
+        _ContactColor ("Contact Blip Color", Color) = (0.4, 0.8, 1.0, 1.0) // Light Blue
         _SweepAngle ("Sweep Angle (Degrees)", Float) = 0
         _SweepWidth ("Trail Width (Degrees)", Float) = 60
-        _MaxDistance ("Max Sonar Range (World Units)", Float) = 500
+        _MaxDistance ("Max Sonar Range (World Units)", Float) = 1000
 
         [Header(Depth and Attenuation Settings)]
         _SubDepth ("Submarine Current Depth (Meters)", Float) = 50.0
@@ -61,6 +62,7 @@ Shader "Custom/SonarCRTDisplay"
             float _SubmarineHeading;
 
             float4 _SonarColor;
+            float4 _ContactColor;
             float _SweepAngle;
             float _SweepWidth;
             float _MaxDistance;
@@ -110,13 +112,13 @@ Shader "Custom/SonarCRTDisplay"
 
             float4 frag (v2f i) : SV_Target
             {
-                // 1. CRT Screen Barrel Curvature
                 float2 crtUV = CurveUVs(i.uv, _Curvature);
 
                 if (crtUV.x < 0.0 || crtUV.x > 1.0 || crtUV.y < 0.0 || crtUV.y > 1.0)
                     return float4(0, 0, 0, 0);
 
                 float2 polarUV = (crtUV - 0.5) * 2.0;
+                polarUV.x = -polarUV.x;
                 float radius = length(polarUV);
                 if (radius > 1.0) return float4(0, 0, 0, 0);
 
@@ -158,20 +160,52 @@ Shader "Custom/SonarCRTDisplay"
                 }
 
                 // 5. Dynamic Contact Blips Array
-                float blipGlow = 0.0;
+                float blipGlow = 0.;
+
+                // Hardcoded color palette mapped to contact slots 0 through 15
+                float3 beaconPalette[16] = {
+                    float3(0.4, 0.8, 1.0), // Slot 0: Light Blue
+                    float3(1.0, 0.6, 0.6), // Slot 1: Red
+                    float3(0.2, 1.0, 0.4), // Slot 2: Green
+                    float3(1.0, 0.9, 0.2), // Slot 3: Yellow
+                    float3(1.0, 0.5, 0.0), // Slot 4: Orange
+                    float3(0.8, 0.3, 1.0), // Slot 5: Purple
+                    float3(0.0, 1.0, 1.0), // Slot 6: Cyan
+                    float3(1.0, 0.4, 0.7), // Slot 7: Pink
+                    float3(0.4, 0.8, 1.0), float3(0.4, 0.8, 1.0), 
+                    float3(0.4, 0.8, 1.0), float3(0.4, 0.8, 1.0),
+                    float3(0.4, 0.8, 1.0), float3(0.4, 0.8, 1.0), 
+                    float3(0.4, 0.8, 1.0), float3(0.4, 0.8, 1.0)  // Fallbacks for slots 8-15
+                };
+                
                 int count = clamp(_ContactCount, 0, 16);
+                float3 totalContactColor = float3(0, 0, 0);
                 for (int c = 0; c < count; c++)
                 {
-                    float targetDist = _Contacts[c].x / max(_MaxDistance, 1.0);
-                    float targetBearing = _Contacts[c].y;
+                    float2 localPos = _Contacts[c].xy; // Local X (right) and Z (forward) from submarine
+                    float rawDist = _Contacts[c].z;
 
-                    float distDiff = abs(radius - targetDist);
-                    float bDiff = abs(angle - targetBearing);
-                    if (bDiff > 180.0) bDiff = 360.0 - bDiff;
+                    // Match the terrain map's exact scaling factor (_MaxDistance * 0.5)
+                    // This places a 4m beacon at 0.8 radius on a 10m max range scope.
+                    float2 normalizedContactPos = localPos / (_MaxDistance * 0.5);
+                    //circular clamping
+                    float contactDist = length(normalizedContactPos);
+                    bool isOOB = contactDist > 1.0;
+                    if (isOOB) {
+                        normalizedContactPos = normalize(normalizedContactPos) * 0.98;
+                    }
 
-                    if (distDiff < 0.2 && bDiff < 6.0 && angleDiff <= width)
+                    // Distance from center of CRT screen (polarUV ranges from -1 to 1)
+                    float distToContact = distance(polarUV, normalizedContactPos);
+
+                    float threshold = isOOB ? 0.025:0.05;
+
+                    // Check if within blip radius threshold (e.g., 0.05 screen units)
+                    if (distToContact < threshold)
                     {
-                        blipGlow += smoothstep(0.2, 0.00, distDiff) * phosphorTrail * 2.0 * signalDecay;
+                        float intensityMod = isOOB ? 1.9:3.5;
+                        blipGlow += smoothstep(0.05, 0.005, distToContact) * intensityMod;
+                        totalContactColor += beaconPalette[c] * blipGlow;
                     }
                 }
 
@@ -181,8 +215,8 @@ Shader "Custom/SonarCRTDisplay"
                 // 6. Static / Grain Artifacts
                 float staticNoise = RandomNoise(crtUV + float2(_Time.x, _Time.y)) * depthRatio * 0.15;
 
-                // 7. Combine Signal Layers
-                float baseIntensity = grid + (phosphorTrail * 0.3) + terrainGlow + blipGlow + centerSubBlip + staticNoise;
+                // 7. Combine Signal Layers (Separating Base Sonar from Blips)
+                float baseIntensity = grid + (phosphorTrail * 0.3) + terrainGlow + centerSubBlip + staticNoise;
 
                 float scanline = sin((crtUV.y + _Time.y * _ScanlineSpeed * 0.01) * _ScanlineCount * 3.14159265);
                 scanline = lerp(1.0, (scanline * 0.5 + 0.5), _ScanlineIntensity);
@@ -190,10 +224,18 @@ Shader "Custom/SonarCRTDisplay"
                 float vignettePowerAdjusted = _VignettePower + (depthRatio * 1.5);
                 float vignette = pow(saturate(1.0 - radius * 0.5), vignettePowerAdjusted);
 
-                float finalIntensity = baseIntensity * scanline * vignette;
-                float3 finalColor = _SonarColor.rgb * finalIntensity * _GlowMultiplier;
+                // Apply scanlines and vignette independently
+                float finalBaseIntensity = baseIntensity * scanline * vignette;
+                float finalBlipIntensity = blipGlow * scanline * vignette;
 
-                return float4(finalColor, saturate(finalIntensity + 0.1));
+                // Combine colors: Phosphor green for the scope, light blue for contacts
+                float3 baseColor = _SonarColor.rgb * finalBaseIntensity * _GlowMultiplier;
+                float3 contactColor = totalContactColor * finalBlipIntensity * _GlowMultiplier;
+                float3 finalColor = baseColor + contactColor;
+
+                float totalAlpha = saturate((finalBaseIntensity + finalBlipIntensity) + 0.1);
+
+                return float4(finalColor, totalAlpha);
             }
             ENDCG
         }

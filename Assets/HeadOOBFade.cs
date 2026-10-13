@@ -10,7 +10,6 @@ public class VRHeadClipFade : MonoBehaviour
     [Header("Fade Settings")]
     [SerializeField] private float fadeDuration = 0.2f;
     [SerializeField] private Color fadeColor = Color.black;
-
     private int overlappingColliders = 0;
     private float currentAlpha = 0f;
     private Material fadeMaterial;

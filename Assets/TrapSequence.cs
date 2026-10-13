@@ -1,49 +1,86 @@
+using System.Collections.Generic;
 using UnityEngine;
 
-public class AcousticTrapSector : MonoBehaviour
+public class SonarMineManager : MonoBehaviour
 {
-    [Header("Sonar & Terrain FX")]
-    [SerializeField] private Material sonarShaderMaterial;
-    [SerializeField] private GameObject[] mineBlips2D;
-    
-    [Header("Events")]
-    [SerializeField] private SubmarineLightGroup lightGroup;
-    [SerializeField] private AudioSource instructorRadio;
-    [SerializeField] private AudioClip panicRadioClip;
+    [Header("References")]
+    [SerializeField] private SonarTerrain sonarTerrain;
+    [SerializeField] private Transform submarine2DProxy;
+    [SerializeField] private GameObject minePrefab;
 
-    private bool trapTriggered = false;
+    [Header("Swarm Parameters")]
+    [SerializeField] private int totalMinesInSector = 40;
+    [SerializeField] private float spawnRadius = 350f;
 
-    private void OnTriggerEnter2D(Collider2D other)
+    private List<SonarMine> activeMines = new List<SonarMine>();
+    private Vector4[] contactBuffer = new Vector4[16];
+
+    private void Start()
     {
-        if (other.CompareTag("Submarine2DProxy") && !trapTriggered)
+        SpawnSwarm();
+    }
+
+    private void SpawnSwarm()
+    {
+        for (int i = 0; i < totalMinesInSector; i++)
         {
-            // Player entered the trench lip volume
-            Debug.Log("[Terrain] Entering Trench Lip: Arming Trap...");
+            // Spawn mines randomly around the starting area in the 2D XY plane
+            Vector2 randomOffset = Random.insideUnitCircle * spawnRadius;
+            Vector3 spawnPos = submarine2DProxy != null ? submarine2DProxy.position + (Vector3)randomOffset : (Vector3)randomOffset;
+
+            GameObject mineObj = Instantiate(minePrefab, spawnPos, Quaternion.identity, transform);
+            SonarMine mine = mineObj.GetComponent<SonarMine>();
+            
+            if (mine != null)
+            {
+                mine.Initialize(submarine2DProxy);
+                activeMines.Add(mine);
+            }
         }
     }
 
-    // Called when player activates active sonar ping inside the trigger zone
-    public void TriggerTrap()
+    private void LateUpdate()
     {
-        if (trapTriggered) return;
-        trapTriggered = true;
+        if (sonarTerrain == null || submarine2DProxy == null || activeMines.Count == 0) return;
 
-        // 1. Play instructor panic audio
-        instructorRadio.PlayOneShot(panicRadioClip);
+        // Clean up null/destroyed mines from the list
+        activeMines.RemoveAll(m => m == null);
 
-        // 2. Trigger cockpit lighting brownout
-        lightGroup.TriggerPowerFailure();
-
-        // 3. Reveal hidden mine contacts on the 2D nav screen
-        foreach (var mine in mineBlips2D)
+        // Sort active mines by distance to the submarine proxy (closest first)
+        activeMines.Sort((a, b) => 
         {
-            mine.SetActive(true);
+            float distA = Vector3.SqrMagnitude(a.transform.position - submarine2DProxy.position);
+            float distB = Vector3.SqrMagnitude(b.transform.position - submarine2DProxy.position);
+            return distA.CompareTo(distB);
+        });
+
+        int contactCount = 0;
+
+        // Process up to the 16 closest mines for the shader buffer
+        for (int i = 0; i < activeMines.Count && contactCount < 16; i++)
+        {
+            SonarMine mine = activeMines[i];
+            Vector3 beaconWorldPos = mine.transform.position;
+            Vector3 directionToBeacon = beaconWorldPos - submarine2DProxy.position;
+            float distance = directionToBeacon.magnitude;
+
+            // Get local position relative to the submarine in 2D XY space
+            Vector3 localPos = submarine2DProxy.InverseTransformPoint(beaconWorldPos);
+
+            // Apply your display scale factor (matching what you used previously, e.g., 200 or 1000)
+            float displayScaleFactor = 200f; 
+            float scaledDistance = distance * displayScaleFactor;
+            Vector3 scaledLocalPos = localPos * displayScaleFactor;
+
+            float signalNormalized = Mathf.Clamp01(1f - (distance / 400f));
+
+            // Pack data into Vector4: x = local X, y = local Y, z = scaled distance, w = signal strength
+            contactBuffer[contactCount] = new Vector4(scaledLocalPos.x, scaledLocalPos.y, scaledDistance, signalNormalized);
+            
+            contactCount++;
         }
 
-        // 4. Inject shader distortion into 2D Sonar Render Texture
-        if (sonarShaderMaterial != null)
-        {
-            sonarShaderMaterial.SetFloat("_SonarDistortion", 1.0f);
-        }
+        // Send the filtered 16 closest contacts to the SonarTerrain display
+        sonarTerrain.UpdateShaderContacts(contactBuffer, contactCount);
     }
 }

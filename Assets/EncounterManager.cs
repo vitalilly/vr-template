@@ -8,6 +8,7 @@ using UnityEngine.Events;
 public class EncounterEvent
 {
     public string encounterName = "SOS Signal";
+
     
     [Header("Trigger Conditions")]
     public TriggerType triggerType = TriggerType.DistanceTraveled;
@@ -68,6 +69,7 @@ public class EncounterManager : MonoBehaviour
     [SerializeField] private AudioSource radioAudioSource;
     [SerializeField] private AudioSource ambientChaosAudioSource;
     [SerializeField] private SonarTerrain sonarDriver;
+    [SerializeField] private CabinFloodingController floodMachine;
 
     [Header("Scripted Encounter List")]
     [SerializeField] private List<EncounterEvent> encounterList = new List<EncounterEvent>();
@@ -274,11 +276,13 @@ public class EncounterManager : MonoBehaviour
         while (timer < encounter.sinkingDuration)
         {
             timer += Time.deltaTime;
-
+            floodMachine.TriggerFloodingSequence();
             if (depthController != null)
             {
-                float newDepth = depthController.GetCurrentDepth() + (encounter.rapidSinkingSpeed * Time.deltaTime);
-                depthController.SetCurrentDepth(newDepth);
+                float dDepth = 0.0f; //init only once so that speed does not slow down
+                if (dDepth == 0.0f){ dDepth = -depthController.GetCurrentDepth() + depthController.GetMaxDepth(); }
+                float newDepth = depthController.GetCurrentDepth() +  (dDepth / encounter.sinkingDuration * Time.deltaTime);
+                depthController.SetCurrentDepth(newDepth); 
             }
 
             if (submarineProxy != null)

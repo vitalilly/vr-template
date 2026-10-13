@@ -23,7 +23,7 @@ public class SonarTerrain : MonoBehaviour
     [Tooltip("World size of the full terrain map texture (e.g. 1000 x 1000). Must NOT be 0!")]
     [SerializeField] private Vector2 mapSizeWorld = new Vector2(1000f, 1000f);
     [Tooltip("Maximum distance viewable on screen in world units. Must NOT be 0!")]
-    [SerializeField] private float maxDistance = 500f;
+    [SerializeField] private float maxDistance = 1000f;
 
     [Header("CRT Shader Settings")]
     [Range(0f, 0.5f)] [SerializeField] private float curvature = 0.15f;
@@ -36,6 +36,8 @@ public class SonarTerrain : MonoBehaviour
 
     // Contact Array Storage for Shader
     private Vector4[] contactsDataArray = new Vector4[16];
+    [SerializeField] private SonarBeacon[] activeBeacons;
+    private Vector4[] contactBuffer = new Vector4[16];
     private int activeContactCount = 0;
 
     // Property IDs
@@ -80,7 +82,7 @@ public class SonarTerrain : MonoBehaviour
         UpdateMaterialProperties();
     }
 
-    private void Update()
+    private void LateUpdate()
     {
         if (sonarMaterial == null) return;
 
@@ -98,6 +100,25 @@ public class SonarTerrain : MonoBehaviour
             sonarMaterial.SetFloat(SubmarineHeadingID, headingRad);
         }
 
+        // Process & Transmit Target Contacts
+        int contactCount = 0;
+
+        for (int i = 0; i < activeBeacons.Length; i++)
+        {
+            if (activeBeacons[i] == null) continue;
+
+            // Process distance, update edge indicators, and retrieve shader data
+            if (activeBeacons[i].ProcessBeacon(submarine2DProxy, out Vector4 contactData))
+            {
+                if (contactCount < 16)
+                {
+                    contactBuffer[contactCount] = contactData;
+                    contactCount++;
+                }
+            }
+        }
+        UpdateShaderContacts(contactBuffer, contactCount);
+
         UpdateMaterialProperties();
     }
 
@@ -110,17 +131,13 @@ public class SonarTerrain : MonoBehaviour
 
         // Dimensions & Scaling
         sonarMaterial.SetVector(MapSizeWorldID, new Vector4(mapSizeWorld.x, mapSizeWorld.y, 0f, 0f));
-        sonarMaterial.SetFloat(MaxDistanceID, maxDistance > 0f ? maxDistance : 500f);
+        sonarMaterial.SetFloat(MaxDistanceID, maxDistance > 0f ? maxDistance : 1000f);
 
         // CRT Post-Effects
         sonarMaterial.SetFloat(CurvatureID, curvature);
         sonarMaterial.SetFloat(ScanlineCountID, scanlineCount);
         sonarMaterial.SetFloat(ScanlineIntensityID, scanlineIntensity);
         sonarMaterial.SetFloat(GlowMultiplierID, glowMultiplier);
-
-        // Pass Contact Array to Shader
-        sonarMaterial.SetVectorArray(ContactsID, contactsDataArray);
-        sonarMaterial.SetInt(ContactCountID, activeContactCount);
     }
 
     /// <summary>
@@ -132,6 +149,12 @@ public class SonarTerrain : MonoBehaviour
         for (int i = 0; i < activeContactCount; i++)
         {
             contactsDataArray[i] = contacts[i];
+        }
+        //push data to the shader
+        if (sonarMaterial != null)
+        {
+            sonarMaterial.SetVectorArray("_Contacts", contactsDataArray);
+            sonarMaterial.SetInt("_ContactCount", activeContactCount);
         }
     }
 

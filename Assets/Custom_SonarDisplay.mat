@@ -41,13 +41,14 @@ Material:
     - _ScanlineCount: 250
     - _ScanlineIntensity: 1
     - _ScanlineSpeed: 3
-    - _SubDepth: 1200
+    - _SubDepth: 50
     - _SubmarineHeading: 0
-    - _SweepAngle: 22.27174
+    - _SweepAngle: 161.31255
     - _SweepSpeed: 1
     - _SweepWidth: 90
     - _VignettePower: 2.01
     m_Colors:
+    - _ContactColor: {r: 0.39999998, g: 0.8, b: 1, a: 1}
     - _MapSizeWorld: {r: 1000, g: 1000, b: 0, a: 0}
     - _SonarColor: {r: 1, g: 0.8806697, b: 0, a: 1}
     - _SubmarinePos: {r: 0, g: 0, b: 0, a: 0}

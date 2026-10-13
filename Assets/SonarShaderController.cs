@@ -22,10 +22,10 @@ public class SonarShaderController : MonoBehaviour
 
     [Header("Target Tracking")]
     [SerializeField] private Transform submarineTransform;
-    [SerializeField] private Transform[] targetEntities;
+    [SerializeField] private SonarBeacon[] activeBeacons;
 
     private float currentSweepAngle = 0f;
-    private Vector4[] contactData = new Vector4[16];
+    private Vector4[] contactBuffer = new Vector4[16];
 
     private void Start()
     {
@@ -50,7 +50,7 @@ public class SonarShaderController : MonoBehaviour
 
         // 2. Transmit Core Sonar Variables
         sonarMaterial.SetFloat("_SweepAngle", currentSweepAngle);
-        sonarMaterial.SetFloat("_MaxDistance", maxRange > 0f ? maxRange : 500f);
+        sonarMaterial.SetFloat("_MaxDistance", maxRange > 0f ? maxRange : 10f);
         sonarMaterial.SetFloat("_SweepWidth", sweepWidthDegrees);
         sonarMaterial.SetColor("_SonarColor", sonarColor);
 
@@ -62,28 +62,6 @@ public class SonarShaderController : MonoBehaviour
         sonarMaterial.SetFloat("_VignettePower", vignettePower);
         sonarMaterial.SetFloat("_GlowMultiplier", bloomGlowMultiplier);
 
-        // 4. Process & Transmit Target Contacts
-        if (submarineTransform != null && targetEntities != null && targetEntities.Length > 0)
-        {
-            int count = Mathf.Min(targetEntities.Length, 16);
-            for (int i = 0; i < count; i++)
-            {
-                if (targetEntities[i] == null) continue;
-
-                Vector3 relativePos = targetEntities[i].position - submarineTransform.position;
-                
-                // Distance (X)
-                float distance = relativePos.magnitude;
-
-                // Bearing in degrees relative to world orientation (Y)
-                float bearing = Mathf.Atan2(relativePos.y, relativePos.x) * Mathf.Rad2Deg;
-                if (bearing < 0f) bearing += 360f;
-
-                contactData[i] = new Vector4(distance, bearing, 1.0f, 0f);
-            }
-
-            sonarMaterial.SetVectorArray("_Contacts", contactData);
-            sonarMaterial.SetInt("_ContactCount", count);
-        }
+        // 4. 
     }
 }
