@@ -41,7 +41,7 @@ Material:
     - _ScanlineCount: 250
     - _ScanlineIntensity: 1
     - _ScanlineSpeed: 3
-    - _SubDepth: 10
+    - _SubDepth: 36.430935
     - _SubmarineHeading: 0
     - _SweepAngle: 161.31255
     - _SweepSpeed: 1

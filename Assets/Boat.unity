@@ -2081,7 +2081,7 @@ MonoBehaviour:
   playIntroSequence: 1
   surfaceStartDepth: 0
   targetDeploymentDepth: 300
-  introDescentDuration: 17
+  introDescentDuration: 19
   descentEaseCurve:
     serializedVersion: 2
     m_Curve:
@@ -2331,7 +2331,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1717954561962503726, guid: f6336ac4ac8b4d34bc5072418cdc62a0, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.737
+      value: 0.55
       objectReference: {fileID: 0}
     - target: {fileID: 1717954561962503726, guid: f6336ac4ac8b4d34bc5072418cdc62a0, type: 3}
       propertyPath: m_LocalPosition.z
@@ -325285,7 +325285,7 @@ MonoBehaviour:
     hasTriggered: 0
   - encounterName: BadVector
     triggerType: 5
-    triggerThreshold: 7
+    triggerThreshold: 9
     wayPointLocation: {fileID: 1273303973}
     dialogueSequence:
     - {fileID: 8300000, guid: 08b6ee14bda6e847a9028b517cbb01a2, type: 3}
@@ -325316,7 +325316,7 @@ MonoBehaviour:
     delayBeforeLightsOff: 1
     sonarContactPosition: {x: 0, y: 0}
     headingLenience: 0
-    expectedDepth: 250
+    expectedDepth: 150
     triggersSinkingSequence: 0
     chaosAudioClips: []
     rapidSinkingSpeed: 0
@@ -325354,7 +325354,7 @@ MonoBehaviour:
     hasTriggered: 0
   - encounterName: UnexpectedResponse
     triggerType: 1
-    triggerThreshold: 3.5
+    triggerThreshold: 3
     wayPointLocation: {fileID: 1136623306}
     dialogueSequence:
     - {fileID: 8300000, guid: 62f6d577424a28e96aa3be05fe03a803, type: 3}
@@ -327798,7 +327798,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6f8db261863f06a20b0271feeeb6caeb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  moveSpeed: 0.28
+  moveSpeed: 3.5
   turnSpeed: 19
   accelerationRate: 30
   lateralDrag: 4
