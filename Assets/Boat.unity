@@ -192,7 +192,7 @@ Light:
   serializedVersion: 13
   m_Type: 2
   m_Color: {r: 0.15294118, g: 0.4, b: 0.14509805, a: 1}
-  m_Intensity: 0.01
+  m_Intensity: 0
   m_Range: 2
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -2081,7 +2081,7 @@ MonoBehaviour:
   playIntroSequence: 1
   surfaceStartDepth: 0
   targetDeploymentDepth: 300
-  introDescentDuration: 19
+  introDescentDuration: 20
   descentEaseCurve:
     serializedVersion: 2
     m_Curve:
@@ -324534,7 +324534,7 @@ Light:
   serializedVersion: 13
   m_Type: 2
   m_Color: {r: 0.99607843, g: 0.99607843, b: 0, a: 1}
-  m_Intensity: 0.01
+  m_Intensity: 0.004
   m_Range: 1
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -325069,7 +325069,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   beaconID: NAV_BEACON_01
-  signalRadius: 12
+  signalRadius: 13.2
   pulseInterval: 15
   acousticPingSound: {fileID: 8300000, guid: 75977b7d0287feae1bdd0258cf82b8c3, type: 3}
   scaleFactor: 100
@@ -325338,7 +325338,7 @@ MonoBehaviour:
     delayBetweenLines: 0.5
     delayBeforeLightsOff: 1
     sonarContactPosition: {x: 0, y: 0}
-    headingLenience: 40
+    headingLenience: 400
     expectedDepth: 0
     triggersSinkingSequence: 0
     chaosAudioClips: []
@@ -325358,6 +325358,7 @@ MonoBehaviour:
     wayPointLocation: {fileID: 1136623306}
     dialogueSequence:
     - {fileID: 8300000, guid: 62f6d577424a28e96aa3be05fe03a803, type: 3}
+    - {fileID: 8300000, guid: 0de1bc73a809302d9a8dab49cd318b60, type: 3}
     delayBetweenLines: 0.5
     delayBeforeLightsOff: 1
     sonarContactPosition: {x: 0, y: 0}
@@ -325377,10 +325378,10 @@ MonoBehaviour:
     hasTriggered: 0
   - encounterName: AutomatedLure
     triggerType: 1
-    triggerThreshold: 3.5
+    triggerThreshold: 3
     wayPointLocation: {fileID: 2130885882}
     dialogueSequence:
-    - {fileID: 8300000, guid: 0de1bc73a809302d9a8dab49cd318b60, type: 3}
+    - {fileID: 8300000, guid: cfef99724e73d1b4c9c2d100ae82eb7d, type: 3}
     - {fileID: 8300000, guid: 13a6730e9ca47061c9cd3a8823dc6524, type: 3}
     - {fileID: 8300000, guid: 745a67ffa132e2898bae4f96559ab4d3, type: 3}
     delayBetweenLines: 0.5
@@ -325392,8 +325393,9 @@ MonoBehaviour:
     chaosAudioClips:
     - {fileID: 8300000, guid: 8490e58f6504776409077cad5dcb75a6, type: 3}
     - {fileID: 8300000, guid: c4d31108b09d11106b1353e499100232, type: 3}
+    - {fileID: 8300000, guid: b6e9530197aff394ca94c3d3bbe2787f, type: 3}
     - {fileID: 8300000, guid: 7b0546366e8f29c46b997067601f9bf9, type: 3}
-    rapidSinkingSpeed: 60
+    rapidSinkingSpeed: 120
     forwardPropulsionSpeed: 0.03
     sinkingDuration: 15
     onEncounterTriggered:
@@ -327055,7 +327057,7 @@ Light:
   serializedVersion: 13
   m_Type: 2
   m_Color: {r: 0.32156864, g: 0.53333336, b: 0.56078434, a: 1}
-  m_Intensity: 0.02
+  m_Intensity: 0.006
   m_Range: 2
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -327798,7 +327800,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6f8db261863f06a20b0271feeeb6caeb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  moveSpeed: 3.5
+  moveSpeed: 3
   turnSpeed: 19
   accelerationRate: 30
   lateralDrag: 4
